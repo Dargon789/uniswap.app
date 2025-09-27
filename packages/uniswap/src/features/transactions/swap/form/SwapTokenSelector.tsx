@@ -1,0 +1,254 @@
+import { QueryClient, useQueryClient } from '@tanstack/react-query'
+import { Currency } from '@uniswap/sdk-core'
+import { useCallback } from 'react'
+import { useDispatch } from 'react-redux'
+import {
+  TokenSelectorModal,
+  TokenSelectorProps,
+  TokenSelectorVariation,
+} from 'uniswap/src/components/TokenSelector/TokenSelector'
+import { TokenSelectorFlow } from 'uniswap/src/components/TokenSelector/types'
+import { useAccountMeta, useUniswapContext } from 'uniswap/src/contexts/UniswapContext'
+import { getSwappableTokensQueryData } from 'uniswap/src/data/apiClients/tradingApi/useTradingApiSwappableTokensQuery'
+import { AssetType, TradeableAsset } from 'uniswap/src/entities/assets'
+import { setHasSeenNetworkSelectorTooltip } from 'uniswap/src/features/behaviorHistory/slice'
+import { useEnabledChains } from 'uniswap/src/features/chains/hooks/useEnabledChains'
+import { UniverseChainId } from 'uniswap/src/features/chains/types'
+import { useTokenProjects } from 'uniswap/src/features/dataApi/tokenProjects'
+import { useTransactionModalContext } from 'uniswap/src/features/transactions/TransactionModal/TransactionModalContext'
+import { SwapFormState, useSwapFormContext } from 'uniswap/src/features/transactions/swap/contexts/SwapFormContext'
+import { getShouldResetExactAmountToken } from 'uniswap/src/features/transactions/swap/form/utils'
+import { maybeLogFirstSwapAction } from 'uniswap/src/features/transactions/swap/utils/maybeLogFirstSwapAction'
+import {
+  getTokenAddressFromChainForTradingApi,
+  toTradingApiSupportedChainId,
+} from 'uniswap/src/features/transactions/swap/utils/tradingApi'
+import { useUnichainTooltipVisibility } from 'uniswap/src/features/unichain/hooks/useUnichainTooltipVisibility'
+import { CurrencyField } from 'uniswap/src/types/currency'
+import { areAddressesEqual } from 'uniswap/src/utils/addresses'
+import { areCurrencyIdsEqual, currencyAddress, currencyId } from 'uniswap/src/utils/currencyId'
+import { useValueAsRef } from 'utilities/src/react/useValueAsRef'
+import { useTrace } from 'utilities/src/telemetry/trace/TraceContext'
+
+export function SwapTokenSelector({ isModalOpen }: { isModalOpen: boolean }): JSX.Element {
+  const { onCurrencyChange } = useTransactionModalContext()
+  const swapContext = useSwapFormContext()
+  const dispatch = useDispatch()
+  const { shouldShowUnichainNetworkSelectorTooltip } = useUnichainTooltipVisibility()
+
+  const traceRef = useValueAsRef(useTrace())
+  const swapContextRef = useValueAsRef(swapContext)
+
+  const activeAccountAddress = useAccountMeta()?.address
+
+  const { isTestnetModeEnabled, defaultChainId } = useEnabledChains()
+  const { setIsSwapTokenSelectorOpen } = useUniswapContext()
+
+  const { updateSwapForm, selectingCurrencyField, output, input, filteredChainIds, isSelectingCurrencyFieldPrefilled } =
+    swapContext
+
+  if (isModalOpen && !selectingCurrencyField) {
+    throw new Error('TokenSelector rendered without `selectingCurrencyField`')
+  }
+
+  const onHideTokenSelector = useCallback(() => {
+    updateSwapForm({
+      selectingCurrencyField: undefined,
+      isSelectingCurrencyFieldPrefilled: false,
+      // reset the filtered chain ids when coming back in from a prefill so it's not persisted forever
+      ...(isSelectingCurrencyFieldPrefilled ? { filteredChainIds: {} } : {}),
+    })
+    setIsSwapTokenSelectorOpen(false) // resets force flag for web on close as cleanup
+
+    // Ensure tooltip is hidden after closing network selector
+    if (shouldShowUnichainNetworkSelectorTooltip) {
+      dispatch(setHasSeenNetworkSelectorTooltip(true))
+    }
+  }, [
+    dispatch,
+    isSelectingCurrencyFieldPrefilled,
+    setIsSwapTokenSelectorOpen,
+    shouldShowUnichainNetworkSelectorTooltip,
+    updateSwapForm,
+  ])
+
+  const inputTokenProjects = useTokenProjects(input ? [currencyId(input)] : [])
+  const outputTokenProjects = useTokenProjects(output ? [currencyId(output)] : [])
+
+  const queryClient = useQueryClient()
+
+  const onSelectCurrency = useCallback(
+    // eslint-disable-next-line complexity
+    (currency: Currency, field: CurrencyField, forceIsBridgePair: boolean) => {
+      const swapCtx = swapContextRef.current
+
+      const tradeableAsset: TradeableAsset = {
+        address: currencyAddress(currency),
+        chainId: currency.chainId,
+        type: AssetType.Currency,
+      }
+
+      const newState: Partial<SwapFormState> = {}
+
+      const otherField = field === CurrencyField.INPUT ? CurrencyField.OUTPUT : CurrencyField.INPUT
+      const otherFieldTradeableAsset = field === CurrencyField.INPUT ? swapCtx.output : swapCtx.input
+
+      const otherFieldTokenProjects = otherField === CurrencyField.INPUT ? inputTokenProjects : outputTokenProjects
+
+      const isBridgePair =
+        // `forceIsBridgePair` means the user explicitly selected a bridge pair.
+        forceIsBridgePair ||
+        (tradeableAsset && otherFieldTradeableAsset
+          ? checkIsBridgePair({
+              queryClient,
+              input: field === CurrencyField.INPUT ? tradeableAsset : otherFieldTradeableAsset,
+              output: field === CurrencyField.OUTPUT ? tradeableAsset : otherFieldTradeableAsset,
+            })
+          : false)
+
+      // swap order if tokens are the same
+      if (otherFieldTradeableAsset && areCurrencyIdsEqual(currencyId(currency), currencyId(otherFieldTradeableAsset))) {
+        const previouslySelectedTradableAsset = field === CurrencyField.INPUT ? swapCtx.input : swapCtx.output
+        // Given that we're swapping the order of tokens, we should also swap the `exactCurrencyField` and update the `focusOnCurrencyField` to make sure the correct input field is focused.
+        newState.exactCurrencyField =
+          swapCtx.exactCurrencyField === CurrencyField.INPUT ? CurrencyField.OUTPUT : CurrencyField.INPUT
+        newState.focusOnCurrencyField = newState.exactCurrencyField
+        newState[otherField] = previouslySelectedTradableAsset
+      } else if (otherFieldTradeableAsset && currency.chainId !== otherFieldTradeableAsset.chainId && !isBridgePair) {
+        const otherCurrencyInNewChain = otherFieldTokenProjects?.data?.find(
+          (project) => project?.currency.chainId === currency.chainId,
+        )
+
+        // if new token chain changes, try to find the other token's match on the new chain
+        const otherTradeableAssetInNewChain: TradeableAsset | undefined = otherCurrencyInNewChain && {
+          address: currencyAddress(otherCurrencyInNewChain.currency),
+          chainId: otherCurrencyInNewChain.currency.chainId,
+          type: AssetType.Currency,
+        }
+
+        newState[otherField] =
+          otherTradeableAssetInNewChain &&
+          otherCurrencyInNewChain &&
+          !areCurrencyIdsEqual(currencyId(currency), otherCurrencyInNewChain.currencyId)
+            ? otherTradeableAssetInNewChain
+            : undefined
+      }
+
+      if (!isBridgePair) {
+        // If selecting output, set the input and output chainIds
+        // If selecting input and output is already selected, also set the input chainId
+        if (field === CurrencyField.OUTPUT || !!swapCtx.output) {
+          swapCtx.filteredChainIds[CurrencyField.INPUT] = currency.chainId
+          swapCtx.filteredChainIds[CurrencyField.OUTPUT] = currency.chainId
+          // If selecting input, only set the output chainId
+        } else {
+          swapCtx.filteredChainIds[CurrencyField.OUTPUT] = currency.chainId
+        }
+
+        newState.filteredChainIds = swapCtx.filteredChainIds
+      }
+
+      newState[field] = tradeableAsset
+
+      if (getShouldResetExactAmountToken(swapCtx, newState)) {
+        newState.exactAmountToken = ''
+      }
+
+      // TODO(WEB-6230): This value is not what we want here, as it breaks bridging in the interface's TDP.
+      //                 Instead, what we want is the `Currency` object from `newState[otherField] || otherFieldTradeableAsset`.
+      const todoFixMeOtherCurrency = otherFieldTokenProjects?.data?.find(
+        (project) => project?.currency.chainId === currency.chainId,
+      )
+
+      const currencyState: { inputCurrency?: Currency; outputCurrency?: Currency } = {
+        inputCurrency: CurrencyField.INPUT === field ? currency : todoFixMeOtherCurrency?.currency,
+        outputCurrency: CurrencyField.OUTPUT === field ? currency : todoFixMeOtherCurrency?.currency,
+      }
+
+      onHideTokenSelector()
+      updateSwapForm(newState)
+      maybeLogFirstSwapAction(traceRef.current)
+      onCurrencyChange?.(currencyState)
+    },
+    // We want to be very careful about how often this function is re-created because it causes the entire token selector list to re-render.
+    // This is why we use `swapContextRef` so that we can access the latest swap context without causing a re-render.
+    // Do not add new dependencies to this function unless you are sure this won't degrade perf.
+    [
+      swapContextRef,
+      inputTokenProjects,
+      outputTokenProjects,
+      queryClient,
+      onHideTokenSelector,
+      updateSwapForm,
+      traceRef,
+      onCurrencyChange,
+    ],
+  )
+
+  const getChainId = (): UniverseChainId | undefined => {
+    const selectedChainId = filteredChainIds[selectingCurrencyField ?? CurrencyField.INPUT]
+
+    // allow undefined for prod networks
+    if (selectedChainId || !isTestnetModeEnabled) {
+      return selectedChainId
+    }
+
+    // should never be undefined for testnets
+    return filteredChainIds[CurrencyField.INPUT] ?? input?.chainId ?? defaultChainId
+  }
+
+  const props: TokenSelectorProps = {
+    isModalOpen,
+    activeAccountAddress,
+    chainId: getChainId(),
+    input,
+    // token selector modal will only open on currency field selection; casting to satisfy typecheck here - we should consider refactoring the types here to avoid casting
+    currencyField: selectingCurrencyField as CurrencyField,
+    flow: TokenSelectorFlow.Swap,
+    variation:
+      selectingCurrencyField === CurrencyField.INPUT
+        ? TokenSelectorVariation.SwapInput
+        : TokenSelectorVariation.SwapOutput,
+    onClose: onHideTokenSelector,
+    onSelectCurrency,
+  }
+  return <TokenSelectorModal {...props} />
+}
+
+/**
+ * Checks if the newly selected output token is bridgeable from the input token.
+ * It does NOT gurantee that this check will work to check if a newly selected input token is bridgeable to the output token.
+ * This is because the Trading API does not currently support querying bridgeable tokens by the output token,
+ * so we can't guarantee that the data will always be cached for this second use case.
+ */
+function checkIsBridgePair({
+  queryClient,
+  input,
+  output,
+}: {
+  queryClient: QueryClient
+  input: TradeableAsset
+  output: TradeableAsset
+}): boolean {
+  if (input.chainId === output.chainId) {
+    return false
+  }
+
+  const tokenIn = getTokenAddressFromChainForTradingApi(input.address, input.chainId)
+  const tokenInChainId = toTradingApiSupportedChainId(input.chainId)
+  const tokenOut = getTokenAddressFromChainForTradingApi(output.address, output.chainId)
+  const tokenOutChainId = toTradingApiSupportedChainId(output.chainId)
+
+  if (!tokenIn || !tokenInChainId || !tokenOut || !tokenOutChainId) {
+    return false
+  }
+
+  const bridgePairs = getSwappableTokensQueryData({
+    params: { tokenIn, tokenInChainId },
+    queryClient,
+  })
+
+  return !!bridgePairs?.tokens.find((token) => {
+    return areAddressesEqual(token.address, tokenOut) && token.chainId === tokenOutChainId
+  })
+}
