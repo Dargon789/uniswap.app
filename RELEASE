@@ -1,0 +1,23 @@
+IPFS hash of the deployment:
+- CIDv0: `QmSHXp5oNAxME6KY7LJy4ndnuBfL3ujQ67aMiPuTUuQ66g`
+- CIDv1: `bafybeib2ui2plf3zbinsp24o4d5ir66yr4a3qlg55kswt2rmlgkoomvigu`
+
+The latest release is always mirrored at [app.uniswap.org](https://app.uniswap.org).
+
+You can also access the Uniswap Interface from an IPFS gateway.
+**BEWARE**: The Uniswap interface uses [`localStorage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage) to remember your settings, such as which tokens you have imported.
+**You should always use an IPFS gateway that enforces origin separation**, or our hosted deployment of the latest release at [app.uniswap.org](https://app.uniswap.org).
+Your Uniswap settings are never remembered across different URLs.
+
+IPFS gateways:
+- https://bafybeib2ui2plf3zbinsp24o4d5ir66yr4a3qlg55kswt2rmlgkoomvigu.ipfs.dweb.link/
+- [ipfs://QmSHXp5oNAxME6KY7LJy4ndnuBfL3ujQ67aMiPuTUuQ66g/](ipfs://QmSHXp5oNAxME6KY7LJy4ndnuBfL3ujQ67aMiPuTUuQ66g/)
+
+## 5.73.0 (2025-02-26)
+
+
+### Features
+
+* **web:** reduce monad testnet quote polling interval (#16719) c99cc6c
+
+
