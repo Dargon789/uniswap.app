@@ -3,7 +3,10 @@ on:
   push:
     branches:
       - 'main'
-
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
 jobs:
   deploy-to-prod:
     runs-on: ubuntu-latest
@@ -30,10 +33,10 @@ jobs:
           custom_tag: ${{ steps.version.outputs.content }}
           tag_prefix: ""
 
-      - name: 🪽 Release
-        uses: actions/create-release@v1.1.0
+      - name: Create Release
+        uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Or use your PAT
         with:
           tag_name: ${{ steps.github-tag-action.outputs.new_tag }}
           release_name: Release ${{ steps.github-tag-action.outputs.new_tag }}
