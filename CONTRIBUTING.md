@@ -25,7 +25,7 @@ Open a [GitHub Issue](https://github.com/Uniswap/interface/issues/new?template=b
 
 - Which app is affected (web, mobile, or extension)
 - Platform (iOS, Android, browser version, etc.)
-- App version (Production or dev)
+- App version (e.g., from the app's 'About' screen, or the Git commit hash if built from source)
 - Steps to reproduce, screenshots, logs, etc.
 
 ### Suggesting Features or Improvements
