@@ -23,7 +23,7 @@
     "turbo-ignore": "2.4.2"
   },
   "engines": {
-    "node": "=18.16.0",
+    "node": "=22.20.0",
     "yarn": ">=3.2.3",
     "npm": "please-use-yarn"
   },
