@@ -35,4 +35,4 @@ Start a [Discussion](https://github.com/Uniswap/interface/discussions) to propos
 ## Repo Overview
 
 - Review the [README](README.md) to understand the repo's general architecture.
-- Familiarize yourself with the [directory structure](README.md#🗂-directory-structure) to better navigate the codebase.
+- Familiarize yourself with the [directory structure](README.md#directory-structure) to better navigate the codebase.
