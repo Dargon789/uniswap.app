@@ -21,7 +21,7 @@ We still welcome your ideas, feedback, and issue reports. The best ways to contr
 
 ### Reporting Bugs
 
-Open a [GitHub Issue](https://github.com/Uniswap/interface/issues/new?template=bug_report.md) and fill out the template. Be sure to include:
+Open a [GitHub Issue](https://github.com/Uniswap/interface/issues/new) and fill out the template. Be sure to include:
 
 - Which app is affected (web, mobile, or extension)
 - Platform (iOS, Android, browser version, etc.)
