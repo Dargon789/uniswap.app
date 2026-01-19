@@ -34,7 +34,7 @@
     "apollo3-cache-persist": "0.14.1",
     "axios": "1.12.2",
     "dayjs": "1.11.7",
-    "ethers": "5.7.2",
+    "ethers": "6.0.0",
     "expo-web-browser": "13.0.3",
     "fuse.js": "6.5.3",
     "graphql": "16.8.1",
