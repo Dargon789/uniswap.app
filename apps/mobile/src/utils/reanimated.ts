@@ -31,7 +31,7 @@ function renderFormat(template: string, options: Record<string, string> & { num?
     }
 
     if (value.indexOf('<') !== -1) {
-      updatedValue = updatedValue.replace('<', '')
+      updatedValue = updatedValue.replace(/</g, '')
       template = '<' + template
     }
 
