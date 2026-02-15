@@ -241,7 +241,7 @@
     "copy-to-clipboard": "3.3.3",
     "d3": "7.6.1",
     "date-fns": "2.30.0",
-    "ethers": "5.7.2",
+    "ethers": "6.0.0",
     "expo-crypto": "12.8.1",
     "fancy-canvas": "2.1.0",
     "focus-visible": "5.2.0",
