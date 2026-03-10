@@ -5,6 +5,7 @@ import { getDeviceId } from '@amplitude/analytics-browser'
 import { ApolloProvider } from '@apollo/client'
 import { PortalProvider } from '@tamagui/portal'
 import { QueryClientProvider } from '@tanstack/react-query'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import Web3Provider, { Web3ProviderUpdater } from 'components/Web3Provider'
 import { WebUniswapProvider } from 'components/Web3Provider/WebUniswapContext'
 import { AssetActivityProvider } from 'graphql/data/apollo/AssetActivityProvider'
@@ -132,6 +133,7 @@ createRoot(container).render(
                                     <PortalProvider>
                                       <ThemedGlobalStyle />
                                       <App />
+                                      <SpeedInsights />
                                     </PortalProvider>
                                   </TamaguiProvider>
                                 </ThemeProvider>
