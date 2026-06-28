@@ -159,7 +159,7 @@
     "wallet": "0.0.1"
   },
   "devDependencies": {
-    "@babel/core": "7.26.0",
+    "@babel/core": "7.29.6",
     "@babel/plugin-proposal-export-namespace-from": "7.18.9",
     "@babel/plugin-proposal-logical-assignment-operators": "7.16.7",
     "@babel/plugin-proposal-numeric-separator": "7.16.7",
